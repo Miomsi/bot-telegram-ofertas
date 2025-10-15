@@ -3,14 +3,11 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 import json
 import os
 import logging
+import re
 
+# Configurações
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-
-if not TOKEN:
-    print("❌ Token não encontrado!")
-    exit(1)
-
 CONFIG_FILE = "config.json"
 
 def carregar_config():
@@ -20,7 +17,7 @@ def carregar_config():
                 return json.load(f)
         except:
             pass
-    return {"produtos": [], "canais": [], "chat_id": None}
+    return {"alertas": {}, "chat_id": None}
 
 def salvar_config(config):
     try:
@@ -30,199 +27,259 @@ def salvar_config(config):
         pass
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        config = carregar_config()
-        config["chat_id"] = update.effective_chat.id
-        salvar_config(config)
-        
-        keyboard = [
-            [InlineKeyboardButton("➕ Adicionar Produto", callback_data="add_produto")],
-            [InlineKeyboardButton("➕ Adicionar Canal", callback_data="add_canal")],
-            [InlineKeyboardButton("🗑️ Remover Produto", callback_data="remover_produto_menu")],
-            [InlineKeyboardButton("🗑️ Remover Canal", callback_data="remover_canal_menu")],
-            [InlineKeyboardButton("📋 Ver Configuração", callback_data="ver_config")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            "🤖 **Bot Monitor de Ofertas**\n\n"
-            "Configure os produtos e canais:",
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
-        
-    except Exception as e:
-        print(f"Erro: {e}")
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        query = update.callback_query
-        await query.answer()
-        
-        if query.data == "add_produto":
-            await query.edit_message_text(
-                "📝 Digite a palavra para monitorar:\nEx: `4070` ou `rtx 4070`",
-                parse_mode='Markdown'
-            )
-            context.user_data["aguardando"] = "novo_produto"
-            
-        elif query.data == "add_canal":
-            await query.edit_message_text(
-                "📢 Digite o @username do canal:\nEx: `@terabyteshopoficial`\n\n⚠️ Só o @username, sem https://",
-                parse_mode='Markdown'
-            )
-            context.user_data["aguardando"] = "novo_canal"
-            
-        elif query.data == "ver_config":
-            await mostrar_configuracao(query)
-            
-        elif query.data == "remover_produto_menu":
-            await remover_produto_menu(query)
-            
-        elif query.data == "remover_canal_menu":
-            await remover_canal_menu(query)
-            
-        elif query.data.startswith("remover_produto:"):
-            produto = query.data.split(":")[1]
-            config = carregar_config()
-            config["produtos"] = [p for p in config["produtos"] if p != produto]
-            salvar_config(config)
-            await query.edit_message_text(f"✅ Produto `{produto}` removido!", parse_mode='Markdown')
-            
-        elif query.data.startswith("remover_canal:"):
-            canal = query.data.split(":")[1]
-            config = carregar_config()
-            config["canais"] = [c for c in config["canais"] if c != canal]
-            salvar_config(config)
-            await query.edit_message_text(f"✅ Canal `{canal}` removido!", parse_mode='Markdown')
-            
-    except Exception as e:
-        print(f"Erro: {e}")
-
-async def remover_produto_menu(query):
     config = carregar_config()
-    
-    if not config["produtos"]:
-        await query.edit_message_text("❌ Nenhum produto para remover!")
-        return
-    
-    keyboard = []
-    for produto in config["produtos"]:
-        keyboard.append([InlineKeyboardButton(f"❌ {produto}", callback_data=f"remover_produto:{produto}")])
-    
-    keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="voltar")])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.edit_message_text(
-        "🗑️ **Remover Produto**\n\nClique no produto para remover:",
-        reply_markup=reply_markup
-    )
-
-async def remover_canal_menu(query):
-    config = carregar_config()
-    
-    if not config["canais"]:
-        await query.edit_message_text("❌ Nenhum canal para remover!")
-        return
-    
-    keyboard = []
-    for canal in config["canais"]:
-        keyboard.append([InlineKeyboardButton(f"❌ {canal}", callback_data=f"remover_canal:{canal}")])
-    
-    keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="voltar")])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.edit_message_text(
-        "🗑️ **Remover Canal**\n\nClique no canal para remover:",
-        reply_markup=reply_markup
-    )
-
-async def mostrar_configuracao(query):
-    config = carregar_config()
-    
-    produtos = "\n".join([f"• {p}" for p in config["produtos"]]) if config["produtos"] else "❌ Nenhum"
-    canais = "\n".join([f"• {c}" for c in config["canais"]]) if config["canais"] else "❌ Nenhum"
+    config["chat_id"] = update.effective_chat.id
+    salvar_config(config)
     
     keyboard = [
-        [InlineKeyboardButton("➕ Adicionar Produto", callback_data="add_produto")],
-        [InlineKeyboardButton("➕ Adicionar Canal", callback_data="add_canal")],
-        [InlineKeyboardButton("🗑️ Remover Produto", callback_data="remover_produto_menu")],
-        [InlineKeyboardButton("🗑️ Remover Canal", callback_data="remover_canal_menu")],
+        [InlineKeyboardButton("➕ Criar Alerta", callback_data="criar_alerta")],
+        [InlineKeyboardButton("📋 Meus Alertas", callback_data="listar_alertas")],
+        [InlineKeyboardButton("❌ Remover Alerta", callback_data="remover_alerta")],
+        [InlineKeyboardButton("ℹ️ Ajuda", callback_data="ajuda")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(
-        f"⚙️ **Configuração Atual**\n\n🛒 **Produtos:**\n{produtos}\n\n📢 **Canais:**\n{canais}",
+    await update.message.reply_text(
+        "🔔 *AlertKey Bot*\n\n"
+        "Monitore canais e receba alertas quando suas palavras-chave aparecerem!\n\n"
+        "*Como usar:*\n"
+        "1. Crie um alerta com palavras-chave\n"
+        "2. Adicione os canais para monitorar\n"
+        "3. Receba notificações em tempo real!",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        if update.message and context.user_data.get("aguardando"):
-            config = carregar_config()
-            texto = update.message.text.strip()
-            
-            if context.user_data["aguardando"] == "novo_produto":
-                if texto.lower() not in config["produtos"]:
-                    config["produtos"].append(texto.lower())
-                    salvar_config(config)
-                    await update.message.reply_text(f"✅ `{texto}` adicionado!", parse_mode='Markdown')
-                else:
-                    await update.message.reply_text("⚠️ Já existe!")
-                    
-            elif context.user_data["aguardando"] == "novo_canal":
-                # Remove qualquer 'https://t.me/' se o usuário colocar
-                texto = texto.replace('https://t.me/', '').replace('t.me/', '')
-                if not texto.startswith('@'):
-                    texto = '@' + texto
-                    
-                if texto.lower() not in config["canais"]:
-                    config["canais"].append(texto.lower())
-                    salvar_config(config)
-                    await update.message.reply_text(f"✅ `{texto}` adicionado!", parse_mode='Markdown')
-                else:
-                    await update.message.reply_text("⚠️ Já existe!")
-            
-            context.user_data["aguardando"] = None
-            
-    except Exception as e:
-        print(f"Erro: {e}")
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    config = carregar_config()
+    
+    if query.data == "criar_alerta":
+        await query.edit_message_text(
+            "🔔 *Criar Novo Alerta*\n\n"
+            "Digite um *nome* para este alerta:\n"
+            "Ex: `Placas de Vídeo` ou `Ofertas PC`",
+            parse_mode='Markdown'
+        )
+        context.user_data["etapa"] = "nome_alerta"
+        
+    elif query.data == "listar_alertas":
+        await listar_alertas(query, config)
+        
+    elif query.data == "remover_alerta":
+        await remover_alerta_menu(query, config)
+        
+    elif query.data == "ajuda":
+        await ajuda(query)
+        
+    elif query.data.startswith("remover_alerta:"):
+        nome_alerta = query.data.split(":")[1]
+        if nome_alerta in config["alertas"]:
+            del config["alertas"][nome_alerta]
+            salvar_config(config)
+            await query.edit_message_text(f"✅ Alerta *{nome_alerta}* removido!", parse_mode='Markdown')
+        await start(update, context)
+        
+    elif query.data == "voltar":
+        await start(update, context)
 
-async def monitorar_ofertas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def listar_alertas(query, config):
+    if not config["alertas"]:
+        await query.edit_message_text(
+            "📋 *Meus Alertas*\n\n"
+            "❌ Nenhum alerta configurado.\n\n"
+            "Clique em *➕ Criar Alerta* para começar!",
+            parse_mode='Markdown'
+        )
+        return
+    
+    mensagem = "📋 *Meus Alertas*\n\n"
+    for nome, dados in config["alertas"].items():
+        palavras = ", ".join(dados["palavras"])
+        canais = ", ".join([c.split('/')[-1] for c in dados["canais"]])
+        mensagem += f"🔔 *{nome}*\n"
+        mensagem += f"   📝 *Palavras:* {palavras}\n"
+        mensagem += f"   📢 *Canais:* {canais}\n\n"
+    
+    keyboard = [[InlineKeyboardButton("🔙 Voltar", callback_data="voltar")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(mensagem, reply_markup=reply_markup, parse_mode='Markdown')
+
+async def remover_alerta_menu(query, config):
+    if not config["alertas"]:
+        await query.edit_message_text("❌ Nenhum alerta para remover!")
+        return
+    
+    keyboard = []
+    for nome in config["alertas"].keys():
+        keyboard.append([InlineKeyboardButton(f"❌ {nome}", callback_data=f"remover_alerta:{nome}")])
+    
+    keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="voltar")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "🗑️ *Remover Alerta*\n\nSelecione o alerta para remover:",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def ajuda(query):
+    texto = (
+        "ℹ️ *Como usar o AlertKey Bot*\n\n"
+        "*1. Criar Alertas:*\n"
+        "   - Clique em *➕ Criar Alerta*\n"
+        "   - Digite um nome para o alerta\n"
+        "   - Adicione palavras-chave (separadas por vírgula)\n"
+        "   - Adicione links de canais\n\n"
+        
+        "*2. Formatos Aceitos:*\n"
+        "   - *Canais:* `https://t.me/nome`, `@nome`, `t.me/nome`\n"
+        "   - *Palavras:* `rtx 4070, placa de vídeo, promoção`\n\n"
+        
+        "*3. Receber Alertas:*\n"
+        "   - Quando suas palavras aparecerem nos canais monitorados\n"
+        "   - Você recebe notificação instantânea\n\n"
+        
+        "*Exemplo Completo:*\n"
+        "```\n"
+        "Nome: Placas NVIDIA\n"
+        "Palavras: rtx 4070, rtx 4060, rtx 3080\n"
+        "Canais: https://t.me/terabyteshopoficial\n"
+        "```"
+    )
+    
+    keyboard = [[InlineKeyboardButton("🔙 Voltar", callback_data="voltar")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(texto, reply_markup=reply_markup, parse_mode='Markdown')
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+        
+    config = carregar_config()
+    texto = update.message.text.strip()
+    user_data = context.user_data
+    
+    if user_data.get("etapa") == "nome_alerta":
+        user_data["nome_alerta"] = texto
+        user_data["etapa"] = "palavras_alerta"
+        
+        await update.message.reply_text(
+            "📝 Agora digite as *palavras-chave* (separadas por vírgula):\n"
+            "Ex: `rtx 4070, placa de vídeo, promoção, nvidia`",
+            parse_mode='Markdown'
+        )
+        
+    elif user_data.get("etapa") == "palavras_alerta":
+        palavras = [p.strip().lower() for p in texto.split(",") if p.strip()]
+        user_data["palavras_alerta"] = palavras
+        user_data["etapa"] = "canais_alerta"
+        
+        await update.message.reply_text(
+            "📢 Agora adicione os *links dos canais* (um por mensagem):\n"
+            "Ex: `https://t.me/terabyteshopoficial`\n\n"
+            "Digite *`pronto`* quando terminar.",
+            parse_mode='Markdown'
+        )
+        user_data["canais_alerta"] = []
+        
+    elif user_data.get("etapa") == "canais_alerta":
+        if texto.lower() == "pronto":
+            # Finalizar criação do alerta
+            if not user_data["canais_alerta"]:
+                await update.message.reply_text("❌ Adicione pelo menos um canal!")
+                return
+                
+            config["alertas"][user_data["nome_alerta"]] = {
+                "palavras": user_data["palavras_alerta"],
+                "canais": user_data["canais_alerta"]
+            }
+            salvar_config(config)
+            
+            # Resumo do alerta criado
+            canais = ", ".join([c.split('/')[-1] for c in user_data["canais_alerta"]])
+            palavras = ", ".join(user_data["palavras_alerta"])
+            
+            await update.message.reply_text(
+                f"✅ *Alerta criado com sucesso!*\n\n"
+                f"🔔 *Nome:* {user_data['nome_alerta']}\n"
+                f"📝 *Palavras:* {palavras}\n"
+                f"📢 *Canais:* {canais}\n\n"
+                f"⚡ Agora você receberá alertas quando estas palavras aparecerem nos canais!",
+                parse_mode='Markdown'
+            )
+            
+            user_data.clear()
+            await start(update, context)
+            
+        else:
+            # Adicionar canal à lista
+            canal = texto.strip()
+            user_data["canais_alerta"].append(canal)
+            
+            await update.message.reply_text(
+                f"✅ Canal adicionado: `{canal}`\n\n"
+                f"📋 *Canais adicionados:* {len(user_data['canais_alerta'])}\n"
+                f"Digite o próximo canal ou *`pronto`* para finalizar.",
+                parse_mode='Markdown'
+            )
+
+async def monitorar_canais(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         message = update.message or update.channel_post
         if not message:
             return
-        
+            
         config = carregar_config()
+        if not config["alertas"]:
+            return
+            
         chat_username = getattr(message.chat, 'username', '')
+        if not chat_username:
+            return
+            
+        canal_atual = f"https://t.me/{chat_username}"
         
-        canal_atual = f"@{chat_username}" if chat_username else ""
-        if canal_atual and canal_atual.lower() in [c.lower() for c in config["canais"]]:
+        # Pega o texto da mensagem
+        texto = ""
+        if message.text:
+            texto = message.text.lower()
+        elif message.caption:
+            texto = message.caption.lower()
+        else:
+            return
+        
+        # Verifica todos os alertas
+        for nome_alerta, dados_alerta in config["alertas"].items():
+            # Verifica se o canal atual está sendo monitorado neste alerta
+            canal_monitorado = False
+            for canal in dados_alerta["canais"]:
+                if chat_username in canal or canal in canal_atual or canal in f"@{chat_username}":
+                    canal_monitorado = True
+                    break
+                    
+            if not canal_monitorado:
+                continue
+                
+            # Verifica palavras-chave
+            palavras_encontradas = []
+            for palavra in dados_alerta["palavras"]:
+                if palavra.lower() in texto:
+                    palavras_encontradas.append(palavra)
             
-            texto = ""
-            if message.text:
-                texto = message.text.lower()
-            elif message.caption:
-                texto = message.caption.lower()
-            else:
-                return
-            
-            produtos_encontrados = []
-            for produto in config["produtos"]:
-                if produto in texto:
-                    produtos_encontrados.append(produto)
-            
-            if produtos_encontrados and config.get("chat_id"):
+            if palavras_encontradas and config.get("chat_id"):
                 chat_title = message.chat.title or "Canal"
                 
                 mensagem_alerta = (
-                    f"🚨 **OFERTA ENCONTRADA!** 🚨\n\n"
+                    f"🚨 *ALERTA: {nome_alerta}* 🚨\n\n"
                     f"**📢 Canal:** {chat_title}\n"
-                    f"**🛒 Produto:** {', '.join(produtos_encontrados)}\n"
-                    f"**📝 Detalhes:** {texto[:200]}...\n\n"
-                    f"🔗 [Ver Oferta](https://t.me/{chat_username}/{message.message_id})"
+                    f"**🔍 Palavras encontradas:** {', '.join(palavras_encontradas)}\n"
+                    f"**📝 Conteúdo:** {texto[:200]}...\n\n"
+                    f"🔗 [Ver Mensagem](https://t.me/{chat_username}/{message.message_id})"
                 )
                 
                 await context.bot.send_message(
@@ -231,23 +288,21 @@ async def monitorar_ofertas(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode='Markdown'
                 )
                 
-                print(f"🎯 OFERTA: {produtos_encontrados} em {chat_title}")
+                print(f"🔔 ALERTA: {nome_alerta} - {palavras_encontradas} em {chat_title}")
                 
     except Exception as e:
         print(f"Erro monitoramento: {e}")
 
-async def voltar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await start(update, context)
-
 def main():
-    print("🤖 Bot iniciado na nuvem! 🌐")
+    print("🤖 AlertKey Bot iniciado! 🔔")
     
     application = Application.builder().token(TOKEN).build()
     
+    # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(MessageHandler(filters.TEXT | filters.CAPTION, monitorar_ofertas))
+    application.add_handler(MessageHandler(filters.TEXT | filters.CAPTION, monitorar_canais))
     
     print("✅ Bot rodando! Envie /start no Telegram")
     
