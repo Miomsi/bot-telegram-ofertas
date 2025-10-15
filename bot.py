@@ -4,16 +4,11 @@ import json
 import os
 import logging
 
-# Configurações para nuvem
 logging.basicConfig(level=logging.INFO)
-
-# ⚠️ MUDANÇA AQUI: Token da variável de ambiente
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
-# Verifica se o token existe
 if not TOKEN:
-    print("❌ ERRO: Token não encontrado!")
-    print("💡 Configure a variável de ambiente TELEGRAM_BOT_TOKEN no Railway")
+    print("❌ Token não encontrado!")
     exit(1)
 
 CONFIG_FILE = "config.json"
@@ -43,6 +38,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("➕ Adicionar Produto", callback_data="add_produto")],
             [InlineKeyboardButton("➕ Adicionar Canal", callback_data="add_canal")],
+            [InlineKeyboardButton("🗑️ Remover Produto", callback_data="remover_produto_menu")],
+            [InlineKeyboardButton("🗑️ Remover Canal", callback_data="remover_canal_menu")],
             [InlineKeyboardButton("📋 Ver Configuração", callback_data="ver_config")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -53,7 +50,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
-        print("✅ Menu /start enviado")
         
     except Exception as e:
         print(f"Erro: {e}")
@@ -72,23 +68,94 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         elif query.data == "add_canal":
             await query.edit_message_text(
-                "📢 Digite o @username do canal:\nEx: `@terabyteshopoficial`",
+                "📢 Digite o @username do canal:\nEx: `@terabyteshopoficial`\n\n⚠️ Só o @username, sem https://",
                 parse_mode='Markdown'
             )
             context.user_data["aguardando"] = "novo_canal"
             
         elif query.data == "ver_config":
-            config = carregar_config()
-            produtos = "\n".join([f"• {p}" for p in config["produtos"]]) if config["produtos"] else "❌ Nenhum"
-            canais = "\n".join([f"• {c}" for c in config["canais"]]) if config["canais"] else "❌ Nenhum"
+            await mostrar_configuracao(query)
             
-            await query.edit_message_text(
-                f"⚙️ **Configuração Atual**\n\n🛒 **Produtos:**\n{produtos}\n\n📢 **Canais:**\n{canais}",
-                parse_mode='Markdown'
-            )
+        elif query.data == "remover_produto_menu":
+            await remover_produto_menu(query)
+            
+        elif query.data == "remover_canal_menu":
+            await remover_canal_menu(query)
+            
+        elif query.data.startswith("remover_produto:"):
+            produto = query.data.split(":")[1]
+            config = carregar_config()
+            config["produtos"] = [p for p in config["produtos"] if p != produto]
+            salvar_config(config)
+            await query.edit_message_text(f"✅ Produto `{produto}` removido!", parse_mode='Markdown')
+            
+        elif query.data.startswith("remover_canal:"):
+            canal = query.data.split(":")[1]
+            config = carregar_config()
+            config["canais"] = [c for c in config["canais"] if c != canal]
+            salvar_config(config)
+            await query.edit_message_text(f"✅ Canal `{canal}` removido!", parse_mode='Markdown')
             
     except Exception as e:
         print(f"Erro: {e}")
+
+async def remover_produto_menu(query):
+    config = carregar_config()
+    
+    if not config["produtos"]:
+        await query.edit_message_text("❌ Nenhum produto para remover!")
+        return
+    
+    keyboard = []
+    for produto in config["produtos"]:
+        keyboard.append([InlineKeyboardButton(f"❌ {produto}", callback_data=f"remover_produto:{produto}")])
+    
+    keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="voltar")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "🗑️ **Remover Produto**\n\nClique no produto para remover:",
+        reply_markup=reply_markup
+    )
+
+async def remover_canal_menu(query):
+    config = carregar_config()
+    
+    if not config["canais"]:
+        await query.edit_message_text("❌ Nenhum canal para remover!")
+        return
+    
+    keyboard = []
+    for canal in config["canais"]:
+        keyboard.append([InlineKeyboardButton(f"❌ {canal}", callback_data=f"remover_canal:{canal}")])
+    
+    keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="voltar")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "🗑️ **Remover Canal**\n\nClique no canal para remover:",
+        reply_markup=reply_markup
+    )
+
+async def mostrar_configuracao(query):
+    config = carregar_config()
+    
+    produtos = "\n".join([f"• {p}" for p in config["produtos"]]) if config["produtos"] else "❌ Nenhum"
+    canais = "\n".join([f"• {c}" for c in config["canais"]]) if config["canais"] else "❌ Nenhum"
+    
+    keyboard = [
+        [InlineKeyboardButton("➕ Adicionar Produto", callback_data="add_produto")],
+        [InlineKeyboardButton("➕ Adicionar Canal", callback_data="add_canal")],
+        [InlineKeyboardButton("🗑️ Remover Produto", callback_data="remover_produto_menu")],
+        [InlineKeyboardButton("🗑️ Remover Canal", callback_data="remover_canal_menu")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        f"⚙️ **Configuração Atual**\n\n🛒 **Produtos:**\n{produtos}\n\n📢 **Canais:**\n{canais}",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -101,18 +168,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     config["produtos"].append(texto.lower())
                     salvar_config(config)
                     await update.message.reply_text(f"✅ `{texto}` adicionado!", parse_mode='Markdown')
-                    print(f"✅ Produto adicionado: {texto}")
                 else:
                     await update.message.reply_text("⚠️ Já existe!")
                     
             elif context.user_data["aguardando"] == "novo_canal":
+                # Remove qualquer 'https://t.me/' se o usuário colocar
+                texto = texto.replace('https://t.me/', '').replace('t.me/', '')
                 if not texto.startswith('@'):
                     texto = '@' + texto
+                    
                 if texto.lower() not in config["canais"]:
                     config["canais"].append(texto.lower())
                     salvar_config(config)
                     await update.message.reply_text(f"✅ `{texto}` adicionado!", parse_mode='Markdown')
-                    print(f"✅ Canal adicionado: {texto}")
                 else:
                     await update.message.reply_text("⚠️ Já existe!")
             
@@ -167,6 +235,9 @@ async def monitorar_ofertas(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
     except Exception as e:
         print(f"Erro monitoramento: {e}")
+
+async def voltar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await start(update, context)
 
 def main():
     print("🤖 Bot iniciado na nuvem! 🌐")
