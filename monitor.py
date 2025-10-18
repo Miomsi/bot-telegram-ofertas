@@ -9,8 +9,9 @@ class TelegramMonitor:
         # Usar sessão string para autenticação no Railway
         session_string = os.getenv('SESSION_STRING')
         if not session_string:
-            raise ValueError("SESSION_STRING não configurada!")
+            raise ValueError("❌ SESSION_STRING não configurada!")
             
+        print("🔐 Configurando cliente com sessão...")
         self.client = TelegramClient(
             StringSession(session_string),
             config.API_ID,
@@ -18,15 +19,29 @@ class TelegramMonitor:
         )
         
     async def start(self):
+        print("🔄 Iniciando conexão...")
+        
+        # Importante: não passar phone number quando usar session string
         await self.client.start()
+        
         print("✅ Monitor autenticado com sucesso!")
         print(f"📡 Monitorando {len(config.CHANNELS)} canais")
         print(f"🔍 Palavras-chave: {', '.join(config.KEYWORDS)}")
         
+        # Verificar se está conectado
+        if await self.client.is_user_authorized():
+            me = await self.client.get_me()
+            print(f"👤 Conectado como: {me.first_name}")
+        else:
+            print("❌ Não autorizado - verifique a SESSION_STRING")
+            return
+        
         # Lista os canais que está monitorando
+        print("📋 Canais monitorados:")
         for channel in config.CHANNELS:
             print(f"   👁️  {channel}")
         
+        # Configurar handler de mensagens
         self.client.add_event_handler(
             self.handle_new_message,
             events.NewMessage(chats=config.CHANNELS)
