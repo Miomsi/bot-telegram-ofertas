@@ -1,15 +1,25 @@
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-import json
 import os
+import json
 import logging
+import asyncio
 import re
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    CallbackQueryHandler,
+    ContextTypes,
+)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telethon import TelegramClient, events
 
-# Configurações
+# === CONFIGURAÇÕES BÁSICAS ===
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 CONFIG_FILE = "config.json"
 
+# === FUNÇÕES DE CONFIGURAÇÃO ===
 def carregar_config():
     if os.path.exists(CONFIG_FILE):
         try:
@@ -26,6 +36,7 @@ def salvar_config(config):
     except:
         pass
 
+# === COMANDOS DO BOT ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     config = carregar_config()
     config["chat_id"] = update.effective_chat.id
@@ -43,9 +54,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔔 *AlertKey Bot*\n\n"
         "Monitore canais e receba alertas quando suas palavras-chave aparecerem!\n\n"
         "*Como usar:*\n"
-        "1. Crie um alerta com palavras-chave\n"
-        "2. Adicione os canais para monitorar\n"
-        "3. Receba notificações em tempo real!",
+        "1️⃣ Crie um alerta com palavras-chave\n"
+        "2️⃣ Adicione os canais para monitorar\n"
+        "3️⃣ Receba notificações em tempo real!",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -60,7 +71,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             "🔔 *Criar Novo Alerta*\n\n"
             "Digite um *nome* para este alerta:\n"
-            "Ex: `Placas de Vídeo` ou `Ofertas PC`",
+            "Exemplo: `Placas de Vídeo` ou `Ofertas PC`",
             parse_mode='Markdown'
         )
         context.user_data["etapa"] = "nome_alerta"
@@ -100,8 +111,8 @@ async def listar_alertas(query, config):
         palavras = ", ".join(dados["palavras"])
         canais = ", ".join([c.split('/')[-1] for c in dados["canais"]])
         mensagem += f"🔔 *{nome}*\n"
-        mensagem += f"   📝 *Palavras:* {palavras}\n"
-        mensagem += f"   📢 *Canais:* {canais}\n\n"
+        mensagem += f"📝 *Palavras:* {palavras}\n"
+        mensagem += f"📢 *Canais:* {canais}\n\n"
     
     keyboard = [[InlineKeyboardButton("🔙 Voltar", callback_data="voltar")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -129,17 +140,17 @@ async def remover_alerta_menu(query, config):
 async def ajuda(query):
     texto = (
         "ℹ️ *Como usar o AlertKey Bot*\n\n"
-        "*1. Criar Alertas:*\n"
+        "*1️⃣ Criar Alertas:*\n"
         "   - Clique em *➕ Criar Alerta*\n"
         "   - Digite um nome para o alerta\n"
         "   - Adicione palavras-chave (separadas por vírgula)\n"
         "   - Adicione links de canais\n\n"
         
-        "*2. Formatos Aceitos:*\n"
+        "*2️⃣ Formatos Aceitos:*\n"
         "   - *Canais:* `https://t.me/nome`, `@nome`, `t.me/nome`\n"
         "   - *Palavras:* `rtx 4070, placa de vídeo, promoção`\n\n"
         
-        "*3. Receber Alertas:*\n"
+        "*3️⃣ Receber Alertas:*\n"
         "   - Quando suas palavras aparecerem nos canais monitorados\n"
         "   - Você recebe notificação instantânea\n\n"
         
@@ -169,8 +180,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data["etapa"] = "palavras_alerta"
         
         await update.message.reply_text(
-            "📝 Agora digite as *palavras-chave* (separadas por vírgula):\n"
-            "Ex: `rtx 4070, placa de vídeo, promoção, nvidia`",
+            "📝 Agora digite as *palavras-chave* (separadas por vírgula):",
             parse_mode='Markdown'
         )
         
@@ -180,8 +190,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data["etapa"] = "canais_alerta"
         
         await update.message.reply_text(
-            "📢 Agora adicione os *links dos canais* (um por mensagem):\n"
-            "Ex: `https://t.me/terabyteshopoficial`\n\n"
+            "📢 Agora adicione os *links dos canais* (um por linha).\n"
             "Digite *`pronto`* quando terminar.",
             parse_mode='Markdown'
         )
@@ -189,7 +198,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     elif user_data.get("etapa") == "canais_alerta":
         if texto.lower() == "pronto":
-            # Finalizar criação do alerta
             if not user_data["canais_alerta"]:
                 await update.message.reply_text("❌ Adicione pelo menos um canal!")
                 return
@@ -200,7 +208,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             }
             salvar_config(config)
             
-            # Resumo do alerta criado
             canais = ", ".join([c.split('/')[-1] for c in user_data["canais_alerta"]])
             palavras = ", ".join(user_data["palavras_alerta"])
             
@@ -209,7 +216,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🔔 *Nome:* {user_data['nome_alerta']}\n"
                 f"📝 *Palavras:* {palavras}\n"
                 f"📢 *Canais:* {canais}\n\n"
-                f"⚡ Agora você receberá alertas quando estas palavras aparecerem nos canais!",
+                f"⚡ Agora você receberá alertas automaticamente!",
                 parse_mode='Markdown'
             )
             
@@ -217,91 +224,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await start(update, context)
             
         else:
-            # Adicionar canal à lista
             canal = texto.strip()
             user_data["canais_alerta"].append(canal)
             
             await update.message.reply_text(
                 f"✅ Canal adicionado: `{canal}`\n\n"
-                f"📋 *Canais adicionados:* {len(user_data['canais_alerta'])}\n"
-                f"Digite o próximo canal ou *`pronto`* para finalizar.",
+                f"Digite o próximo canal ou *`pronto`*.",
                 parse_mode='Markdown'
             )
 
-async def monitorar_canais(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        message = update.message or update.channel_post
-        if not message:
-            return
-            
-        config = carregar_config()
-        if not config["alertas"]:
-            return
-            
-        chat_username = getattr(message.chat, 'username', '')
-        if not chat_username:
-            return
-            
-        canal_atual = f"https://t.me/{chat_username}"
-        
-        # Pega o texto da mensagem
-        texto = ""
-        if message.text:
-            texto = message.text.lower()
-        elif message.caption:
-            texto = message.caption.lower()
-        else:
-            return
-        
-        # Verifica todos os alertas
-        for nome_alerta, dados_alerta in config["alertas"].items():
-            # Verifica se o canal atual está sendo monitorado neste alerta
-            canal_monitorado = False
-            for canal in dados_alerta["canais"]:
-                if chat_username in canal or canal in canal_atual or canal in f"@{chat_username}":
-                    canal_monitorado = True
-                    break
-                    
-            if not canal_monitorado:
-                continue
-                
-            # Verifica palavras-chave
-            palavras_encontradas = []
-            for palavra in dados_alerta["palavras"]:
-                if palavra.lower() in texto:
-                    palavras_encontradas.append(palavra)
-            
-            if palavras_encontradas and config.get("chat_id"):
-                chat_title = message.chat.title or "Canal"
-                
-                mensagem_alerta = (
-                    f"🚨 *ALERTA: {nome_alerta}* 🚨\n\n"
-                    f"**📢 Canal:** {chat_title}\n"
-                    f"**🔍 Palavras encontradas:** {', '.join(palavras_encontradas)}\n"
-                    f"**📝 Conteúdo:** {texto[:200]}...\n\n"
-                    f"🔗 [Ver Mensagem](https://t.me/{chat_username}/{message.message_id})"
-                )
-                
-                await context.bot.send_message(
-                    chat_id=config["chat_id"],
-                    text=mensagem_alerta,
-                    parse_mode='Markdown'
-                )
-                
-                print(f"🔔 ALERTA: {nome_alerta} - {palavras_encontradas} em {chat_title}")
-                
-    except Exception as e:
-        print(f"Erro monitoramento: {e}")
-# --- Integração com Telethon (para ler canais) ---
-from telethon import TelegramClient, events
-import asyncio
-
-# Usa as mesmas variáveis do bot
+# === MONITORAMENTO COM TELETHON ===
 API_ID = int(os.getenv('TG_API_ID', 0))
 API_HASH = os.getenv('TG_API_HASH', '')
 SESSION_NAME = "monitor_session"
-
-# Cria cliente Telethon
 client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 
 async def iniciar_monitoramento(application):
@@ -312,7 +247,6 @@ async def iniciar_monitoramento(application):
             if not config.get("alertas") or not config.get("chat_id"):
                 return
 
-            # Nome do canal
             chat = await event.get_chat()
             username = getattr(chat, 'username', None)
             if not username:
@@ -349,21 +283,21 @@ async def iniciar_monitoramento(application):
     await client.start()
     await client.run_until_disconnected()
 
+# === FUNÇÃO PRINCIPAL ===
 def main():
     print("🤖 AlertKey Bot iniciado! 🔔")
 
     application = Application.builder().token(TOKEN).build()
 
-    # Handlers do bot
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Inicia o Telethon junto com o bot
     loop = asyncio.get_event_loop()
     loop.create_task(iniciar_monitoramento(application))
 
     print("✅ Bot rodando! Envie /start no Telegram")
     application.run_polling()
 
-
+if __name__ == "__main__":
+    main()
