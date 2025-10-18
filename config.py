@@ -11,7 +11,7 @@ class Config:
     USER_ID = int(os.getenv('USER_ID', '123456789'))
     
     # Monitoramento
-    KEYWORDS = [keyword.strip().lower() for keyword in os.getenv('KEYWORDS', 'oferta,promocao,desconto').split(',')]
+    KEYWORDS = [keyword.strip().lower() for keyword in os.getenv('KEYWORDS', '5070,4070').split(',')]
     
     # ⚠️ CANAIS PARA MONITORAR - ADICIONE SEUS LINKS AQUI ⚠️
     CHANNELS = [
@@ -22,7 +22,7 @@ class Config:
         # ⬇️⬇️⬇️ ADICIONE MAIS CANAIS AQUI ⬇️⬇️⬇️
         # 'https://t.me/nomedocanal',
         # 'https://t.me/outrocanal',
-        'https://t.me/projsmionsi',      # testes     
+        'https://t.me/+LuNXz5RYUMpkMGQx',      # testes     
     ]
 
 config = Config()
