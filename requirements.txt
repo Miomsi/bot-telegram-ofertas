@@ -1,6 +1,2 @@
-python-telegram-bot==21.2
-telethon==1.41.1
-requests
-
-
-update requirements for cloud deploy
+python-telegram-bot==20.7
+telethon==1.36.0
