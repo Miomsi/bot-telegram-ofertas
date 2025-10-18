@@ -16,6 +16,8 @@ class Config:
     # ⚠️ CANAIS PARA MONITORAR - ADICIONE SEUS LINKS AQUI ⚠️
     CHANNELS = [
         'https://t.me/terabyteshopoficial',  # TERABYTE - JÁ ADICIONADO
+        'https://t.me/guigatudo',            # guigao
+        'https://t.me/ganhandonanetbrofc',   # garimpo
 
         # ⬇️⬇️⬇️ ADICIONE MAIS CANAIS AQUI ⬇️⬇️⬇️
         # 'https://t.me/nomedocanal',
