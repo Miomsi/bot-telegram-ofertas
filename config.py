@@ -8,16 +8,21 @@ class Config:
     
     # Bot
     BOT_TOKEN = os.getenv('BOT_TOKEN', '7639172116:AMM7XvC_1hpVdN9WxcjBrqi1RciHYoofA')
-    USER_ID = int(os.getenv('USER_ID', '123456789'))  # ← Use seu USER_ID real aqui
+    USER_ID = int(os.getenv('USER_ID', '123456789'))
     
     # Monitoramento
     KEYWORDS = [keyword.strip().lower() for keyword in os.getenv('KEYWORDS', 'oferta,promocao,desconto').split(',')]
     
-    # Canais para monitorar - ADICIONE CANAIS REAIS AQUI
+    # ⚠️ CANAIS PARA MONITORAR - ADICIONE SEUS LINKS AQUI ⚠️
     CHANNELS = [
-        '@canal_ofertas1',
-        '@canal_ofertas2'
-        # Adicione @usernames de canais reais
+        'https://t.me/terabyteshopoficial',  # TERABYTE - JÁ ADICIONADO
+        'https://t.me/pelando',              # Pelando (canal muito ativo)
+        'https://t.me/promocoeseofertas',    # Promoções e Ofertas
+        'https://t.me/canaldeofertas',       # Canal de Ofertas
+        # ⬇️⬇️⬇️ ADICIONE MAIS CANAIS AQUI ⬇️⬇️⬇️
+        # 'https://t.me/nomedocanal',
+        # 'https://t.me/outrocanal',
+        'https://t.me/projsmionsi',      # testes     
     ]
 
 config = Config()
