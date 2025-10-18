@@ -19,22 +19,24 @@ class TelegramMonitor:
         )
         
     async def start(self):
-        print("🔄 Iniciando conexão...")
+        print("🔄 Iniciando conexão com sessão...")
         
-        # Importante: não passar phone number quando usar session string
-        await self.client.start()
+        # Método CORRETO para iniciar sem input interativo
+        await self.client.connect()
         
-        print("✅ Monitor autenticado com sucesso!")
+        # Verificar se está autorizado
+        if not await self.client.is_user_authorized():
+            print("❌ Sessão inválida ou expirada")
+            # Tentar reconectar com a sessão existente
+            await self.client.sign_in(phone=lambda: config.PHONE_NUMBER, code=lambda: '000000')
+            return
+        
+        print("✅ Sessão válida! Verificando usuário...")
+        me = await self.client.get_me()
+        print(f"👤 Conectado como: {me.first_name} (@{me.username})")
+        
         print(f"📡 Monitorando {len(config.CHANNELS)} canais")
         print(f"🔍 Palavras-chave: {', '.join(config.KEYWORDS)}")
-        
-        # Verificar se está conectado
-        if await self.client.is_user_authorized():
-            me = await self.client.get_me()
-            print(f"👤 Conectado como: {me.first_name}")
-        else:
-            print("❌ Não autorizado - verifique a SESSION_STRING")
-            return
         
         # Lista os canais que está monitorando
         print("📋 Canais monitorados:")
