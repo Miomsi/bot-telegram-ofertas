@@ -16,9 +16,7 @@ class Config:
     # ⚠️ CANAIS PARA MONITORAR - ADICIONE SEUS LINKS AQUI ⚠️
     CHANNELS = [
         'https://t.me/terabyteshopoficial',  # TERABYTE - JÁ ADICIONADO
-        'https://t.me/pelando',              # Pelando (canal muito ativo)
-        'https://t.me/promocoeseofertas',    # Promoções e Ofertas
-        'https://t.me/canaldeofertas',       # Canal de Ofertas
+
         # ⬇️⬇️⬇️ ADICIONE MAIS CANAIS AQUI ⬇️⬇️⬇️
         # 'https://t.me/nomedocanal',
         # 'https://t.me/outrocanal',
