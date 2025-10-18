@@ -22,7 +22,7 @@ class Config:
         # ⬇️⬇️⬇️ ADICIONE MAIS CANAIS AQUI ⬇️⬇️⬇️
         # 'https://t.me/nomedocanal',
         # 'https://t.me/outrocanal',
-        'https://t.me/+LuNXz5RYUMpkMGQx',      # testes     
+        'https://t.me/testesofertas21',      # testes     
     ]
 
 config = Config()
