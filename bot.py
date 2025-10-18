@@ -292,21 +292,78 @@ async def monitorar_canais(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
     except Exception as e:
         print(f"Erro monitoramento: {e}")
+# --- Integração com Telethon (para ler canais) ---
+from telethon import TelegramClient, events
+import asyncio
+
+# Usa as mesmas variáveis do bot
+API_ID = int(os.getenv('TG_API_ID', 0))
+API_HASH = os.getenv('TG_API_HASH', '')
+SESSION_NAME = "monitor_session"
+
+# Cria cliente Telethon
+client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+
+async def iniciar_monitoramento(application):
+    @client.on(events.NewMessage())
+    async def handler(event):
+        try:
+            config = carregar_config()
+            if not config.get("alertas") or not config.get("chat_id"):
+                return
+
+            # Nome do canal
+            chat = await event.get_chat()
+            username = getattr(chat, 'username', None)
+            if not username:
+                return
+
+            texto = event.message.message.lower() if event.message.message else ""
+            if not texto:
+                return
+
+            canal_link = f"https://t.me/{username}"
+
+            for nome_alerta, dados_alerta in config["alertas"].items():
+                if not any(canal_link in c or f"@{username}" in c for c in dados_alerta["canais"]):
+                    continue
+
+                palavras = [p for p in dados_alerta["palavras"] if p.lower() in texto]
+                if palavras:
+                    mensagem_alerta = (
+                        f"🚨 *ALERTA: {nome_alerta}* 🚨\n\n"
+                        f"📢 Canal: {chat.title or username}\n"
+                        f"🔍 Palavras: {', '.join(palavras)}\n"
+                        f"📝 {texto[:200]}...\n"
+                        f"🔗 [Ver Mensagem]({canal_link}/{event.message.id})"
+                    )
+                    await application.bot.send_message(
+                        chat_id=config["chat_id"],
+                        text=mensagem_alerta,
+                        parse_mode='Markdown'
+                    )
+        except Exception as e:
+            print(f"Erro Telethon: {e}")
+
+    print("👀 Monitoramento de canais iniciado com Telethon...")
+    await client.start()
+    await client.run_until_disconnected()
 
 def main():
     print("🤖 AlertKey Bot iniciado! 🔔")
-    
+
     application = Application.builder().token(TOKEN).build()
-    
-    # Handlers
+
+    # Handlers do bot
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(MessageHandler(filters.TEXT | filters.CAPTION, monitorar_canais))
-    
+
+    # Inicia o Telethon junto com o bot
+    loop = asyncio.get_event_loop()
+    loop.create_task(iniciar_monitoramento(application))
+
     print("✅ Bot rodando! Envie /start no Telegram")
-    
     application.run_polling()
 
-if __name__ == '__main__':
-    main()
+
